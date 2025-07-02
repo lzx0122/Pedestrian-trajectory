@@ -41,7 +41,7 @@
 您可以在以下網址下載本專案使用的 3D 模型：
 
 - [模型下載連結](https://drive.google.com/file/d/1Hk7y5TisuSYN7E3b9-cjDKY_c6m4Gb3K/view?usp=sharing) <!-- 請將此處的空連結替換為您的模型下載網址 -->
-  直接丟到 public 資料夾
+  解壓縮直接丟到 public 資料夾
   路徑為 public/assets/
 
 ## 建置專案
