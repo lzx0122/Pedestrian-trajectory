@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <title>行人軌跡</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+    <link rel="stylesheet" href="./src/loadingModal.css" />
+    <link rel="stylesheet" href="./src/reset.css" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <div
+      id="header"
+      class="position-fixed top-0 start-0 w-100 bg-dark text-white p-4 d-flex flex-column flex-md-row justify-content-between align-items-center rounded-bottom shadow-lg"
+      style="height: 70px"
+    >
+      <div
+        id="text"
+        class="h5 mb-0 text-light text-center text-md-start mb-2 mb-md-0 w-100 w-md-auto text-truncate"
+        style="max-width: 60%"
+      >
+        預測約 5.6 秒後，行人1 將進入警示區！
+      </div>
+
+      <div
+        id="controls"
+        class="d-flex flex-wrap justify-content-center justify-content-md-end align-items-center gap-3 gap-md-4 w-100 w-md-auto"
+      >
+        <div class="d-flex align-items-center">
+          <span class="text-nowrap fw-bold me-2 fs-6">秒數:</span>
+          <span
+            id="sec"
+            class="badge bg-success fs-5 px-3 py-2 rounded-pill shadow-sm"
+            >0</span
+          >
+        </div>
+
+        <div class="d-flex align-items-center">
+          <label
+            for="speed"
+            class="form-label mb-0 text-nowrap fw-bold me-2 fs-6"
+            >速度</label
+          >
+          <input
+            type="number"
+            name="speed"
+            id="speed"
+            value="60"
+            max="60"
+            min="1"
+            class="form-control form-control-sm w-auto shadow-sm"
+            style="max-width: 80px; margin-right: 0.75rem"
+          />
+          <input
+            type="checkbox"
+            id="perspective"
+            class="form-check-input my-0 shadow-sm"
+          />
+          <label
+            for="perspective"
+            class="form-check-label text-nowrap ms-2 fs-6"
+            >第三視角</label
+          >
+        </div>
+
+        <div class="d-flex align-items-center gap-3">
+          <input
+            type="button"
+            id="restart"
+            class="btn btn-outline-light btn-md shadow-sm"
+            value="重新整理"
+          />
+          <input
+            type="button"
+            id="start"
+            class="btn btn-primary btn-md shadow-sm"
+            value="開始模擬"
+          />
+        </div>
+      </div>
+    </div>
+    <div id="warning"></div>
+    <div
+      id="pedestrian-settings-panel"
+      class="position-fixed top-0 end-0 bg-dark bg-opacity-75 p-3 rounded-3 shadow-lg text-white"
+      style="
+        z-index: 1020;
+        margin-top: 75px;
+        margin-right: 1.5rem;
+        width: 150px;
+      "
+    >
+      <h6 class="fw-bold text-center border-bottom border-secondary pb-2 mb-3">
+        <i class="bi bi-person-walking"></i> 行人路徑設定
+      </h6>
+      <form id="pedestrian-form-panel">
+        <fieldset class="mb-3">
+          <legend class="fs-6 fw-bold">開始位置</legend>
+
+          <div class="input-group input-group-sm mb-1">
+            <span
+              class="input-group-text bg-secondary text-white border-secondary"
+              style="width: 30px"
+              >X</span
+            >
+            <input
+              type="number"
+              class="form-control"
+              id="startX_panel"
+              value="0"
+              step="0.1"
+            />
+          </div>
+
+          <div class="input-group input-group-sm">
+            <span
+              class="input-group-text bg-secondary text-white border-secondary"
+              style="width: 30px"
+              >Z</span
+            >
+            <input
+              type="number"
+              class="form-control"
+              id="startZ_panel"
+              value="0"
+              step="0.1"
+            />
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend class="fs-6 fw-bold">結束位置</legend>
+          <div class="input-group input-group-sm mb-1">
+            <span
+              class="input-group-text bg-secondary text-white border-secondary"
+              style="width: 30px"
+              >X</span
+            >
+            <input
+              type="number"
+              class="form-control"
+              id="endX_panel"
+              value="0"
+              step="0.1"
+            />
+          </div>
+
+          <div class="input-group input-group-sm">
+            <span
+              class="input-group-text bg-secondary text-white border-secondary"
+              style="width: 30px"
+              >Z</span
+            >
+            <input
+              type="number"
+              class="form-control"
+              id="endZ_panel"
+              value="0"
+              step="0.1"
+            />
+          </div>
+        </fieldset>
+      </form>
+      <input
+        type="button"
+        id="resetStep"
+        class="btn btn-primary btn-sm shadow-sm mt-2"
+        value="刷新路徑"
+      />
+    </div>
+    <div
+      id="loading-list-container"
+      class="position-fixed bottom-0 end-0 m-4 bg-dark bg-opacity-75 p-4 rounded-3 shadow-lg text-white z-50 fade-transition"
+    >
+      <h2 class="fs-5 fw-bold mb-3 text-center">加載清單</h2>
+      <div
+        id="loading-items"
+        class="d-flex flex-column gap-2 loading-list-scrollable"
+      ></div>
+      <input
+        type="button"
+        id="loading-modal"
+        class="btn btn-primary btn-sm shadow-sm"
+        value="載入模型"
+      />
+    </div>
+
+    <div id="speed_ui"></div>
+
+    <script type="module" src="./src/index.js"></script>
+  </body>
+</html>

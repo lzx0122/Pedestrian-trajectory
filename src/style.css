@@ -1,0 +1,131 @@
+/* :root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale; 
+}*/
+/* 
+#text {
+  font-size: 2rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.87);
+} */
+
+/* #header {
+  height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #242424;
+} */
+
+/* #perspective {
+  width: 100px;
+  height: 100px;
+  background-color: #ff0000;
+}
+#controls {
+  display: flex;
+  font-size: 3rem;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #ffffff;
+} */
+/* .btn {
+  display: inline-block;
+  margin-right: 1rem;
+  width: 100px;
+  height: 100px;
+  margin-top: auto;
+  margin-bottom: auto;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  text-decoration: none;
+  border-radius: 5px;
+  transition: background-color 0.3s ease;
+} */
+/* 
+.btn:hover {
+  background-color: #0056b3;
+  cursor: pointer;
+} */
+
+/* #step {
+  margin-right: 1rem;
+  font-size: 3rem;
+}
+
+#speed {
+  height: 50px;
+  width: 70px;
+  font-size: 2rem;
+}
+
+#restart {
+  background-color: yellowgreen;
+}
+
+#start {
+  background-color: #0056b3;
+} */
+
+/* label {
+  color: #ffffff;
+} */
+
+.warning {
+  position: absolute;
+  right: 50vw;
+  top: 50px;
+  text-align: center;
+}
+
+/* @keyframes slideDown {
+  from {
+    transform: translate(-50%, -100%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -70%);
+    opacity: 1;
+  }
+} */
+
+.centered-alert {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  transform: translate(-50%, -70%);
+  /* animation: slideDown 0.4s ease-out; */
+}
+
+#speed_ui {
+  position: absolute;
+  top: 85%;
+  left: 5%;
+  font-size: 3rem;
+  width: 200px;
+  height: 100px;
+  line-height: 100px;
+  color: rgb(140, 167, 255);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.blink {
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}

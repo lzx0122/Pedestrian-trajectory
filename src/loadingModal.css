@@ -1,0 +1,50 @@
+/* 自定義加載清單的最大高度和滾動條樣式 */
+.loading-list-scrollable {
+  max-height: 16rem; /* 類似 Tailwind 的 max-h-64 (16 * 16px = 256px) */
+  overflow-y: auto;
+  padding-right: 0.5rem; /* 模擬 pr-2 */
+}
+
+/* 自定義滾動條樣式 */
+.loading-list-scrollable::-webkit-scrollbar {
+  width: 8px;
+}
+
+.loading-list-scrollable::-webkit-scrollbar-track {
+  background: #4a5568; /* 深灰色 */
+  border-radius: 10px;
+}
+
+.loading-list-scrollable::-webkit-scrollbar-thumb {
+  background: #cbd5e0; /* 淺灰色 */
+  border-radius: 10px;
+}
+
+.loading-list-scrollable::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0; /* 更深的淺灰色 */
+}
+
+/* 指示燈圓點大小 */
+.indicator-circle {
+  width: 1rem; /* 16px */
+  height: 1rem; /* 16px */
+}
+
+/* 加載中指示燈的動畫 */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+.animate-pulse-custom {
+  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* 容器顯示/隱藏的過渡效果 (在這裡變成純視覺效果，因為沒有JS控制顯示隱藏) */
+.fade-transition {
+  transition: opacity 0.3s ease-in-out;
+}
