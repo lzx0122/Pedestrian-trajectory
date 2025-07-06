@@ -71,6 +71,23 @@
           >
         </div>
 
+        <div class="d-flex align-items-center">
+          <label
+            for="car-delay"
+            class="form-label mb-0 text-nowrap fw-bold me-2 fs-6"
+            >車輛延遲</label
+          >
+          <input
+            type="number"
+            class="form-control form-control-sm w-auto shadow-sm"
+            id="car-delay"
+            value="0"
+            step="0.1"
+            min="0"
+            style="max-width: 80px"
+          />
+        </div>
+
         <div class="d-flex align-items-center gap-3">
           <input
             type="button"
@@ -165,6 +182,24 @@
               id="endZ_panel"
               value="0"
               step="0.1"
+            />
+          </div>
+        </fieldset>
+        <fieldset class="mt-3">
+          <legend class="fs-6 fw-bold">延遲 (秒)</legend>
+          <div class="input-group input-group-sm">
+            <span
+              class="input-group-text bg-secondary text-white border-secondary"
+              style="width: 30px"
+              ><i class="bi bi-clock"></i
+            ></span>
+            <input
+              type="number"
+              class="form-control"
+              id="pedestrian-delay"
+              value="0"
+              step="0.1"
+              min="0"
             />
           </div>
         </fieldset>

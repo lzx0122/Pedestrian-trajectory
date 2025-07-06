@@ -31,6 +31,9 @@ let animateId = null;
 let startTime = null;
 let isBrakingActive = false;
 let originalCarSteps = [];
+let carDelay = 0;
+let pedestrianDelay = 0;
+let lastCarAngle = 0;
 
 // --- 場景物件變數 ---
 let carModel; // 3D 模型
@@ -94,13 +97,13 @@ speed_ui(carSpeed);
 let ped1 = new obj({
   name: "行人1",
   color: 0x013220,
-  speed: 60,
+  speed: 3, // 行人固定速度
   steps: calculateTimeForSteps({
     steps: interpolateSteps({
       steps: config.pedSteps,
       distancePerStep: config.distancePerStep,
     }),
-    speed: 3,
+    speed: 3, // 行人固定速度
   }),
   entitySize: { length: 0.5, width: 0.5 },
   modelFun: null,
@@ -110,8 +113,8 @@ let car = new obj({
   name: "car",
   color: 0x007bff,
   speed: carSpeed,
-  startPoint: { x: 0, z: -50 },
-  endPoint: { x: -2, z: 30 },
+  startPoint: { x: -21, z: -50 },
+  endPoint: { x: 19, z: 50 },
   entitySize: { length: 4.63, width: config.params.w_car },
   modelFun: null,
 });
@@ -122,11 +125,18 @@ let cameraMode = "FPP";
 setFPP();
 
 function setFPP() {
-  camera.lookAt(car.endPoint.x, 2, car.endPoint.z);
-  camera.rotation.set(0, 0, 0);
-  camera.position.set(car.startPoint.x, 2, car.startPoint.z);
-  camera.rotateY(-Math.PI / 2);
-  camera.rotateX(-20 * (Math.PI / 180));
+  if (car.steps.length < 1) return; // Do nothing if there's no path
+
+  const startStep = car.steps[0];
+  // If there's only one step, look slightly ahead in the last known direction
+  const nextStep = car.steps[1] || {
+    // Use the last known angle to project a point to look at
+    x: startStep.x + Math.sin(lastCarAngle),
+    z: startStep.z + Math.cos(lastCarAngle),
+  };
+
+  camera.position.set(startStep.x, 2, startStep.z);
+  camera.lookAt(nextStep.x, 2, nextStep.z);
 }
 
 function setTPP() {
@@ -315,23 +325,49 @@ function simulateBrakingSteps(car, step, reactionTime_s, brakeAccel_mps2) {
 function preShowTrajectory() {
   let tempPoints = new Map();
   let collisions = [];
-  let stepsForPrediction =
-    originalCarSteps.length > 0 ? [...originalCarSteps] : [...car.steps];
-  if (originalCarSteps.length === 0)
-    stepsForPrediction = car.steps.map((step) => ({ ...step }));
 
-  for (let step = 0; step < stepsForPrediction.length; step++) {
-    const marker = showTrajectory(car, step, car.color);
-    stepsForPrediction[step].maker = marker;
-    setTrajectoryMaps(tempPoints, marker, step);
+  const currentCarDelay =
+    parseFloat(document.getElementById("car-delay").value) || 0;
+  const currentPedestrianDelay =
+    parseFloat(document.getElementById("pedestrian-delay").value) || 0;
+
+  // Create a non-mutating, temporary copy of car steps with delay applied
+  const adjustedCarSteps = car.steps.map((step) => ({
+    ...step,
+    time: step.time + currentCarDelay,
+  }));
+
+  for (let i = 0; i < adjustedCarSteps.length; i++) {
+    const marker = showTrajectory(
+      { ...car, steps: adjustedCarSteps },
+      i,
+      car.color
+    );
+    if (car.steps[i]) {
+      car.steps[i].maker = marker;
+    }
+    setTrajectoryMaps(tempPoints, marker, i);
   }
 
   for (let ped of peds) {
     let isCollisionDetectedForPed = false;
-    for (let step = 0; step < ped.steps.length; step++) {
-      const marker = showTrajectory(ped, step, ped.color);
-      ped.steps[step].maker = marker;
-      setTrajectoryMaps(tempPoints, marker, step);
+
+    // Create a non-mutating, temporary copy of pedestrian steps with delay applied
+    const adjustedPedSteps = ped.steps.map((step) => ({
+      ...step,
+      time: step.time + currentPedestrianDelay,
+    }));
+
+    for (let i = 0; i < adjustedPedSteps.length; i++) {
+      const marker = showTrajectory(
+        { ...ped, steps: adjustedPedSteps },
+        i,
+        ped.color
+      );
+      if (ped.steps[i]) {
+        ped.steps[i].maker = marker;
+      }
+      setTrajectoryMaps(tempPoints, marker, i);
     }
 
     for (let [timeKey, pointInfo] of tempPoints) {
@@ -344,7 +380,7 @@ function preShowTrajectory() {
               collisions.push({
                 pedName: ped.name,
                 time: time,
-                type: "警示區", // 標記類型
+                type: "警示區",
                 pedObj: pedObj,
                 carObj: pointInfo.carObj,
               });
@@ -356,7 +392,7 @@ function preShowTrajectory() {
               collisions.push({
                 pedName: ped.name,
                 time: time,
-                type: "物理碰撞", // 標記類型
+                type: "物理碰撞",
                 pedObj: pedObj,
                 carObj: pointInfo.carObj,
               });
@@ -378,7 +414,12 @@ function preShowTrajectory() {
     const firstCollision = collisions[0];
     const timeToCollision = parseFloat(firstCollision.time);
 
-    textElement.innerHTML = `預測約 ${timeToCollision} 秒後，${firstCollision.pedName} 將發生 <strong style="color: red;">[${firstCollision.type}]</strong>！`;
+    const actualTimeToCollision =
+      timeToCollision - Math.min(currentCarDelay, currentPedestrianDelay);
+
+    textElement.innerHTML = `預測約 ${actualTimeToCollision.toFixed(1)} 秒後，${
+      firstCollision.pedName
+    } 將發生 <strong style="color: red;">[${firstCollision.type}]</strong>！`;
 
     const collisionPed = firstCollision.pedObj;
     const pedBoxGeo = new THREE.BoxGeometry(
@@ -407,8 +448,22 @@ function preShowTrajectory() {
 preShowTrajectory();
 
 function createPlayObjects() {
+  // Initial position for the car
+  const initialCarStep = car.steps[0];
+  if (!initialCarStep) return; // Guard against empty steps
+  const initialCarPosition = new THREE.Vector3(
+    initialCarStep.x,
+    0.1,
+    initialCarStep.z
+  );
+  const nextCarStep = car.steps[1] || initialCarStep;
+  const dxCar = nextCarStep.x - initialCarStep.x;
+  const dzCar = nextCarStep.z - initialCarStep.z;
+  const initialCarAngle = Math.atan2(dxCar, dzCar);
+  lastCarAngle = initialCarAngle;
+
   carBodyPlaceholder = new THREE.Mesh(
-    new THREE.BoxGeometry(car.entitySize.width, 0.2, car.entitySize.length), // 修正：交換寬度和長度，使長邊沿 Z 軸
+    new THREE.BoxGeometry(car.entitySize.width, 0.2, car.entitySize.length),
     new THREE.MeshBasicMaterial({
       color: 0x000000,
       opacity: 0.3,
@@ -416,12 +471,16 @@ function createPlayObjects() {
     })
   );
   carBodyPlaceholder.name = "carBodyPlaceholder";
+  carBodyPlaceholder.position.set(initialCarStep.x, 0.1, initialCarStep.z);
+  carBodyPlaceholder.rotation.y = initialCarAngle;
   scene.add(carBodyPlaceholder);
 
   if (car.model) {
     carModel = car.model.clone();
     carModel.name = "carModel";
     carModel.scale.set(0.02, 0.01, 0.02);
+    carModel.position.set(initialCarStep.x, 0.1, initialCarStep.z);
+    carModel.rotation.y = initialCarAngle + Math.PI / 2;
     scene.add(carModel);
   }
 
@@ -434,9 +493,14 @@ function createPlayObjects() {
     })
   );
   carEllipse.name = "collisionEllipse";
+  carEllipse.position.set(initialCarStep.x, 0.01, initialCarStep.z);
+  carEllipse.rotation.y = initialCarAngle;
   scene.add(carEllipse);
 
   pedsPlayObjects = peds.map((ped) => {
+    const initialPedStep = ped.steps[0];
+    if (!initialPedStep) return null;
+
     const box = new THREE.Mesh(
       new THREE.BoxGeometry(ped.entitySize.length, 0.01, ped.entitySize.width),
       new THREE.MeshBasicMaterial({
@@ -446,6 +510,7 @@ function createPlayObjects() {
       })
     );
     box.name = ped.name;
+    box.position.set(initialPedStep.x, 0.01, initialPedStep.z);
     scene.add(box);
 
     if (ped.model) {
@@ -454,11 +519,13 @@ function createPlayObjects() {
       pedModel.scale.set(0.015, 0.015, 0.015);
       pedModel.rotation.z = -Math.PI / 2;
       pedModel.rotation.x = -Math.PI / 2;
+      pedModel.position.set(initialPedStep.x, 0.01, initialPedStep.z);
       pedsPlayModels.push(pedModel);
       scene.add(pedModel);
     }
     return box;
   });
+  pedsPlayObjects = pedsPlayObjects.filter((p) => p !== null);
 }
 
 function removePlayObjects() {
@@ -490,6 +557,9 @@ function play() {
   elapsedTime = 0;
   isBrakingActive = false;
   isPlayCollision = false;
+  carDelay = parseFloat(document.getElementById("car-delay").value) || 0;
+  pedestrianDelay =
+    parseFloat(document.getElementById("pedestrian-delay").value) || 0;
 
   if (originalCarSteps.length > 0) {
     car.steps = originalCarSteps.map((step) => ({ ...step }));
@@ -533,8 +603,9 @@ function animate(time) {
     const elapsedSeconds = elapsedTime / 1000;
     secElement.innerHTML = elapsedSeconds.toFixed(1);
 
+    const carElapsedSeconds = Math.max(0, elapsedSeconds - carDelay);
     const carCurrentStepIndex = car.steps.findIndex(
-      (step) => step.time > elapsedSeconds
+      (step) => step.time > carElapsedSeconds
     );
     let tempStepNum =
       carCurrentStepIndex !== -1
@@ -549,10 +620,15 @@ function animate(time) {
       const dz = nextStep.z - carStep.z;
       if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
         carAngle = Math.atan2(dx, dz); // 修正：使用正確的參數順序
+        lastCarAngle = carAngle;
+      } else {
+        carAngle = lastCarAngle;
       }
+    } else {
+      carAngle = lastCarAngle;
     }
 
-    if (carStep) {
+    if (carStep && elapsedSeconds >= carDelay) {
       if (carBodyPlaceholder) {
         carBodyPlaceholder.position.set(carStep.x, 0.1, carStep.z);
         carBodyPlaceholder.rotation.y = carAngle;
@@ -582,8 +658,9 @@ function animate(time) {
     }
 
     peds.forEach((ped, index) => {
+      const pedElapsedSeconds = Math.max(0, elapsedSeconds - pedestrianDelay);
       const pedCurrentStepIndex = ped.steps.findIndex(
-        (step) => step.time > elapsedSeconds
+        (step) => step.time > pedElapsedSeconds
       );
       const pedStep =
         ped.steps[
@@ -591,7 +668,11 @@ function animate(time) {
             ? Math.max(0, pedCurrentStepIndex - 1)
             : ped.steps.length - 1
         ];
-      if (pedStep && pedsPlayObjects[index]) {
+      if (
+        pedStep &&
+        pedsPlayObjects[index] &&
+        elapsedSeconds >= pedestrianDelay
+      ) {
         pedsPlayObjects[index].position.set(pedStep.x, 0.01, pedStep.z);
         if (pedsPlayModels[index]) {
           pedsPlayModels[index].position.set(pedStep.x, 0.01, pedStep.z);
@@ -602,40 +683,46 @@ function animate(time) {
     let minTtc = Infinity;
     let isInWarningZone = false;
     const logicVehicle = carBodyPlaceholder;
+    const carIsActive = elapsedSeconds >= carDelay;
 
-    peds.forEach((ped, index) => {
+    for (const [index, ped] of peds.entries()) {
       const pedBox = pedsPlayObjects[index];
-      if (!pedBox || !logicVehicle) return;
+      if (!pedBox || !logicVehicle) continue;
 
-      if (
-        checkPhysicalCollision(
-          logicVehicle.position,
-          car.entitySize,
-          carAngle,
-          pedBox.position,
-          ped.entitySize
-        )
-      ) {
-        isPlayCollision = true;
-        warningElement.innerHTML = `<div class="position-absolute top-0 start-50 translate-middle-x alert alert-danger centered-alert display-4" role="alert">碰撞發生！</div>`;
-        setObjectColor(carModel, 0xff0000);
-        setObjectColor(carBodyPlaceholder, 0xff0000);
-        isPlaying = false;
-        playEnabledButton();
-        return;
-      }
+      const pedIsActive = elapsedSeconds >= pedestrianDelay;
 
-      if (
-        checkCollision(
-          car,
-          logicVehicle.position,
-          pedBox.position,
-          ped.entitySize,
-          carAngle
-        )
-      ) {
-        isInWarningZone = true;
-        if (!ped.isWarned) ped.isWarned = true;
+      // Only perform collision checks if both entities are active
+      if (carIsActive && pedIsActive) {
+        if (
+          checkPhysicalCollision(
+            logicVehicle.position,
+            car.entitySize,
+            carAngle,
+            pedBox.position,
+            ped.entitySize
+          )
+        ) {
+          isPlayCollision = true;
+          warningElement.innerHTML = `<div class="position-absolute top-0 start-50 translate-middle-x alert alert-danger centered-alert display-4" role="alert">碰撞發生！</div>`;
+          setObjectColor(carModel, 0xff0000);
+          setObjectColor(carBodyPlaceholder, 0xff0000);
+          isPlaying = false;
+          playEnabledButton();
+          break; // Exit the loop immediately
+        }
+
+        if (
+          checkCollision(
+            car,
+            logicVehicle.position,
+            pedBox.position,
+            ped.entitySize,
+            carAngle
+          )
+        ) {
+          isInWarningZone = true;
+          if (!ped.isWarned) ped.isWarned = true;
+        }
       }
 
       // Use the earliest of the two possible collision times for TTC
@@ -647,26 +734,24 @@ function animate(time) {
           minTtc = timeToCollision;
         }
       }
-    });
+    }
 
     if (shouldWarn(minTtc, car) && !isBrakingActive) {
       isBrakingActive = true;
       brakeIndicator.style.display = "block";
       warningElement.classList.add("blink");
 
-      const currentCarStepIdx = car.steps.findIndex(
-        (step) => step.time > elapsedSeconds
-      );
+      // carCurrentStepIndex is already calculated above using the correct carElapsedSeconds
       const newBrakingSteps = simulateBrakingSteps(
         car,
-        currentCarStepIdx > 0 ? currentCarStepIdx - 1 : 0,
+        carCurrentStepIndex > 0 ? carCurrentStepIndex - 1 : 0,
         config.params.t_reaction,
         config.params.a_brake
       );
 
       car.steps.splice(
-        currentCarStepIdx,
-        car.steps.length - currentCarStepIdx,
+        carCurrentStepIndex,
+        car.steps.length - carCurrentStepIndex,
         ...newBrakingSteps
       );
     }
@@ -780,6 +865,15 @@ document.querySelector("#speed").addEventListener("change", (e) => {
   car.speed = parseInt(e.target.value);
   updateSpeed(car.speed);
   originalCarSteps = [];
+  car.resetSteps(); // 重新計算車輛路徑
+  clearMaker();
+  preShowTrajectory();
+});
+document.getElementById("car-delay").addEventListener("change", () => {
+  clearMaker();
+  preShowTrajectory();
+});
+document.getElementById("pedestrian-delay").addEventListener("change", () => {
   clearMaker();
   preShowTrajectory();
 });
@@ -802,9 +896,17 @@ function updatePedestrianPathFromPanel() {
   preShowTrajectory();
 }
 
-document.getElementById("loading-modal").addEventListener("click", () => {
-  ped1.modelFun = loadModelOBJ("person");
-  car.modelFun = loadModelOBJ("car");
+document.getElementById("loading-modal").addEventListener("click", async () => {
+  try {
+    const [personModel, carModel] = await Promise.all([
+      loadModelOBJ("person"),
+      loadModelOBJ("car"),
+    ]);
+    ped1.model = personModel;
+    car.model = carModel;
+  } catch (error) {
+    console.error("Failed to load models:", error);
+  }
 });
 document
   .getElementById("pedestrian-settings-panel")
