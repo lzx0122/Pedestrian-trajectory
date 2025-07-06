@@ -8,6 +8,8 @@ import {
   shouldWarn,
   loadModelOBJ,
   loadModelFBX,
+  calculateTimeForSteps,
+  interpolateSteps,
 } from "./PTlib.js";
 
 import { speed_ui, updateSpeed } from "./components/speed_ui.js";
@@ -92,9 +94,14 @@ speed_ui(carSpeed);
 let ped1 = new obj({
   name: "行人1",
   color: 0x013220,
-  speed: 3,
-  startPoint: { x: startX_panel, z: startZ_panel },
-  endPoint: { x: endX_panel, z: endZ_panel },
+  speed: 60,
+  steps: calculateTimeForSteps({
+    steps: interpolateSteps({
+      steps: config.pedSteps,
+      distancePerStep: config.distancePerStep,
+    }),
+    speed: 3,
+  }),
   entitySize: { length: 0.5, width: 0.5 },
   modelFun: null,
 });
@@ -103,8 +110,8 @@ let car = new obj({
   name: "car",
   color: 0x007bff,
   speed: carSpeed,
-  startPoint: { x: -50, z: -1 },
-  endPoint: { x: 50, z: -1 },
+  startPoint: { x: 0, z: -50 },
+  endPoint: { x: -2, z: 30 },
   entitySize: { length: 4.63, width: config.params.w_car },
   modelFun: null,
 });
@@ -115,6 +122,7 @@ let cameraMode = "FPP";
 setFPP();
 
 function setFPP() {
+  camera.lookAt(car.endPoint.x, 2, car.endPoint.z);
   camera.rotation.set(0, 0, 0);
   camera.position.set(car.startPoint.x, 2, car.startPoint.z);
   camera.rotateY(-Math.PI / 2);
@@ -205,18 +213,33 @@ function setTrajectoryMaps(tempPoints, maker, step) {
         const carMkr = carPoint.carObj.maker;
         const pedMkr = maker;
 
+        const carStepIndex = car.steps.findIndex((s) => s.maker === carMkr);
+        const nextCarStep =
+          car.steps[carStepIndex + 1] || car.steps[carStepIndex];
+
+        let carAngle = 0;
+        if (nextCarStep && carMkr) {
+          const dx = nextCarStep.x - carMkr.position.x;
+          const dz = nextCarStep.z - carMkr.position.z;
+          if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
+            carAngle = Math.atan2(dx, dz); // 修正：使用正確的參數順序
+          }
+        }
+
         // 執行橢圓警示區檢查
         const isInWarningZone = checkCollision(
           carMkr.obj,
           carMkr.position,
           pedMkr.position,
-          pedMkr.obj.entitySize
+          pedMkr.obj.entitySize,
+          carAngle
         );
 
         // 執行物理實體碰撞檢查
         const isPhysicalHit = checkPhysicalCollision(
           carMkr.position,
           carMkr.obj.entitySize,
+          carAngle,
           pedMkr.position,
           pedMkr.obj.entitySize
         );
@@ -385,7 +408,7 @@ preShowTrajectory();
 
 function createPlayObjects() {
   carBodyPlaceholder = new THREE.Mesh(
-    new THREE.BoxGeometry(car.entitySize.length, 0.2, car.entitySize.width),
+    new THREE.BoxGeometry(car.entitySize.width, 0.2, car.entitySize.length), // 修正：交換寬度和長度，使長邊沿 Z 軸
     new THREE.MeshBasicMaterial({
       color: 0x000000,
       opacity: 0.3,
@@ -399,7 +422,6 @@ function createPlayObjects() {
     carModel = car.model.clone();
     carModel.name = "carModel";
     carModel.scale.set(0.02, 0.01, 0.02);
-    carModel.rotation.y = Math.PI / 2;
     scene.add(carModel);
   }
 
@@ -521,19 +543,31 @@ function animate(time) {
     const carStep = car.steps[tempStepNum];
     const nextStep = car.steps[carCurrentStepIndex] || carStep;
 
+    let carAngle = 0;
+    if (nextStep && carStep) {
+      const dx = nextStep.x - carStep.x;
+      const dz = nextStep.z - carStep.z;
+      if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
+        carAngle = Math.atan2(dx, dz); // 修正：使用正確的參數順序
+      }
+    }
+
     if (carStep) {
       if (carBodyPlaceholder) {
         carBodyPlaceholder.position.set(carStep.x, 0.1, carStep.z);
+        carBodyPlaceholder.rotation.y = carAngle;
       }
       if (carModel) {
         carModel.position.set(carStep.x, 0.1, carStep.z);
+        carModel.rotation.y = carAngle + Math.PI / 2; // 修正：補償模型本身的朝向
       }
       if (carEllipse) {
         carEllipse.position.set(carStep.x, 0.01, carStep.z);
+        carEllipse.rotation.y = carAngle;
         carEllipse.scale.set(
-          car.collistionScope.length / 2,
+          car.collistionScope.width / 2,
           1,
-          car.collistionScope.width / 2
+          car.collistionScope.length / 2
         );
       }
       if (carStep.speed !== undefined) updateSpeed(carStep.speed.toFixed(0));
@@ -577,6 +611,7 @@ function animate(time) {
         checkPhysicalCollision(
           logicVehicle.position,
           car.entitySize,
+          carAngle,
           pedBox.position,
           ped.entitySize
         )
@@ -595,7 +630,8 @@ function animate(time) {
           car,
           logicVehicle.position,
           pedBox.position,
-          ped.entitySize
+          ped.entitySize,
+          carAngle
         )
       ) {
         isInWarningZone = true;

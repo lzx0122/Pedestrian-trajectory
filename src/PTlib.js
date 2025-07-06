@@ -118,63 +118,112 @@ export function calcSteps({ startPoint, endPoint, speed, isRandom }) {
 }
 
 //檢查是否碰撞
-export function checkCollision(carObj, carPosition, pedPosition, pedSize) {
-  const semiMajorAxis = carObj.collistionScope.length / 2;
-  const semiMinorAxis = carObj.collistionScope.width / 2;
+export function checkCollision(
+  carObj,
+  carPosition,
+  pedPosition,
+  pedSize,
+  carAngle = 0
+) {
+  const semiMajorAxis = carObj.collistionScope.length / 2; // 長半軸 (z)
+  const semiMinorAxis = carObj.collistionScope.width / 2; // 短半軸 (x)
 
-  // 考慮行人的矩形範圍
-  const pedHalfLength = (pedSize?.length || 0.5) / 2;
-  const pedHalfWidth = (pedSize?.width || 0.5) / 2;
+  // 1. 計算行人中心到車輛中心的向量
+  const dx = pedPosition.x - carPosition.x;
+  const dz = pedPosition.z - carPosition.z;
 
-  // 計算行人矩形邊界
-  const pedMinX = pedPosition.x - pedHalfLength;
-  const pedMaxX = pedPosition.x + pedHalfLength;
-  const pedMinZ = pedPosition.z - pedHalfWidth;
-  const pedMaxZ = pedPosition.z + pedHalfWidth;
+  // 2. 計算這個向量的角度
+  const angleToPed = Math.atan2(dx, dz);
 
-  // 找到矩形上離汽車中心最近的點
-  const closestX = Math.max(pedMinX, Math.min(carPosition.x, pedMaxX));
-  const closestZ = Math.max(pedMinZ, Math.min(carPosition.z, pedMaxZ));
+  // 3. 計算行相對於車輛旋轉方向的角度差
+  // 我們需要將 atan2 的 -PI 到 PI 範圍正規化到 0 到 2PI
+  let angleDiff = (angleToPed - carAngle) % (2 * Math.PI);
+  if (angleDiff < 0) {
+    angleDiff += 2 * Math.PI;
+  }
 
-  // 計算最近點到汽車中心的距離
-  const dx = closestX - carPosition.x;
-  const dz = closestZ - carPosition.z;
+  // 4. 根據這個角度差，使用橢圓的極座標方程式計算在該方向上的橢圓半徑
+  const cosAngleDiff = Math.cos(angleDiff);
+  const sinAngleDiff = Math.sin(angleDiff);
 
-  // 橢圓方程式判斷
-  const ellipseEquation =
-    Math.pow(dx / semiMajorAxis, 2) + Math.pow(dz / semiMinorAxis, 2);
+  const radiusAtAngle =
+    (semiMajorAxis * semiMinorAxis) /
+    Math.sqrt(
+      Math.pow(semiMajorAxis * sinAngleDiff, 2) +
+        Math.pow(semiMinorAxis * cosAngleDiff, 2)
+    );
 
-  return ellipseEquation <= 1;
+  // 5. 計算行人與車輛的實際距離
+  const distance = Math.sqrt(dx * dx + dz * dz);
+
+  // 6. 如果實際距離小於或等於在該方向上的橢圓半徑，則發生碰撞
+  return distance <= radiusAtAngle;
 }
 
-//車子和行人是否碰撞
+//車子和行人是否碰撞 (使用 OBB)
 export function checkPhysicalCollision(
   carPosition,
   carSize,
+  carAngle,
   pedPosition,
   pedSize
 ) {
-  const carHalfLength = carSize.length / 2;
-  const carHalfWidth = carSize.width / 2;
-  const carMinX = carPosition.x - carHalfLength;
-  const carMaxX = carPosition.x + carHalfLength;
-  const carMinZ = carPosition.z - carHalfWidth;
-  const carMaxZ = carPosition.z + carHalfWidth;
+  const getAxes = (angle, size) => {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return [
+      { x: cos, z: sin },
+      { x: -sin, z: cos },
+    ];
+  };
 
-  const pedHalfLength = pedSize.length / 2;
-  const pedHalfWidth = pedSize.width / 2;
-  const pedMinX = pedPosition.x - pedHalfLength;
-  const pedMaxX = pedPosition.x + pedHalfLength;
-  const pedMinZ = pedPosition.z - pedHalfWidth;
-  const pedMaxZ = pedPosition.z + pedHalfWidth;
+  const getCorners = (position, size, angle) => {
+    const halfWidth = size.width / 2;
+    const halfLength = size.length / 2;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
 
-  const isColliding =
-    carMaxX > pedMinX &&
-    carMinX < pedMaxX &&
-    carMaxZ > pedMinZ &&
-    carMinZ < pedMaxZ;
+    const x1 = halfWidth * cos;
+    const z1 = halfWidth * sin;
+    const x2 = halfLength * -sin;
+    const z2 = halfLength * cos;
 
-  return isColliding;
+    return [
+      { x: position.x + x1 + x2, z: position.z + z1 + z2 },
+      { x: position.x - x1 + x2, z: position.z - z1 + z2 },
+      { x: position.x - x1 - x2, z: position.z - z1 - z2 },
+      { x: position.x + x1 - x2, z: position.z + z1 - z2 },
+    ];
+  };
+
+  const project = (corners, axis) => {
+    let min = Infinity,
+      max = -Infinity;
+    for (const corner of corners) {
+      const dot = corner.x * axis.x + corner.z * axis.z;
+      min = Math.min(min, dot);
+      max = Math.max(max, dot);
+    }
+    return { min, max };
+  };
+
+  const carCorners = getCorners(carPosition, carSize, carAngle);
+  const pedCorners = getCorners(pedPosition, pedSize, 0); // 行人通常不旋轉
+
+  const axes = [
+    ...getAxes(carAngle, carSize),
+    ...getAxes(0, pedSize), // 行人軸
+  ];
+
+  for (const axis of axes) {
+    const p1 = project(carCorners, axis);
+    const p2 = project(pedCorners, axis);
+    if (p1.max < p2.min || p2.max < p1.min) {
+      return false; // 找到分離軸，沒有碰撞
+    }
+  }
+
+  return true; // 沒有找到分離軸，發生碰撞
 }
 
 // 發出警示
@@ -270,6 +319,62 @@ export function loadModelOBJ(fileName) {
       }
     );
   });
+}
+
+export function interpolateSteps({ steps, distancePerStep }) {
+  if (!steps || steps.length < 2) {
+    return steps;
+  }
+
+  const newSteps = [steps[0]]; // 從第一個點開始
+
+  for (let i = 1; i < steps.length; i++) {
+    const startPoint = steps[i - 1];
+    const endPoint = steps[i];
+
+    const dx = endPoint.x - startPoint.x;
+    const dz = endPoint.z - startPoint.z;
+    const segmentDistance = Math.sqrt(dx * dx + dz * dz);
+
+    if (segmentDistance === 0) continue; // 如果點重合，則跳過
+
+    const numSubSteps = Math.ceil(segmentDistance / distancePerStep);
+
+    for (let j = 1; j <= numSubSteps; j++) {
+      const t = j / numSubSteps;
+      const newX = startPoint.x + dx * t;
+      const newZ = startPoint.z + dz * t;
+      newSteps.push({ x: newX, z: newZ });
+    }
+  }
+  return newSteps;
+}
+
+export function calculateTimeForSteps({ steps, speed }) {
+  if (!steps || steps.length === 0) {
+    return [];
+  }
+
+  const speedMps = (speed * 1000) / 3600; // km/h 轉 m/s
+  const timedSteps = steps.map((step) => ({ ...step })); // 創建副本以避免修改原始數據
+
+  timedSteps[0].time = 0;
+
+  for (let i = 1; i < timedSteps.length; i++) {
+    const prevStep = timedSteps[i - 1];
+    const currentStep = timedSteps[i];
+
+    const segmentDx = currentStep.x - prevStep.x;
+    const segmentDz = currentStep.z - prevStep.z;
+    const segmentDistance = Math.sqrt(
+      segmentDx * segmentDx + segmentDz * segmentDz
+    );
+
+    const timeForSegment = segmentDistance / speedMps;
+    currentStep.time = prevStep.time + timeForSegment;
+  }
+
+  return timedSteps;
 }
 
 export function loadModelFBX(fileName) {

@@ -1,95 +1,57 @@
-import { exp } from "three/tsl";
-import { calcSteps } from "./PTlib";
-import { config } from "./config";
+import { calcSteps } from "./PTlib.js";
+import { config } from "./config.js";
 
 export class obj {
-  name = "";
-  steps = [];
-  color = 0x000000;
-  _entitySize = { length: 1, width: 1 };
-  collistionScope = { length: 1, width: 1 };
-  _speed = 10;
-  startPoint;
-  endPoint;
-  model = null;
-
-  constructor({ name, color, steps, startPoint, endPoint, speed, entitySize }) {
+  constructor({
+    name,
+    color,
+    speed,
+    steps,
+    startPoint,
+    endPoint,
+    entitySize,
+    modelFun,
+  }) {
     this.name = name;
     this.color = color;
+    this.speed = speed;
+    this.steps = steps || [];
     this.startPoint = startPoint;
     this.endPoint = endPoint;
-    this._entitySize = entitySize;
-    this.speed = speed;
-    this.steps =
-      steps ||
-      calcSteps({ startPoint, endPoint, speed, isRandom: name != "car" });
-  }
+    this.entitySize = entitySize;
+    this.modelFun = modelFun;
+    this.model = null;
+    this.isWarned = false;
 
-  resetSteps() {
-    let temp = calcSteps({
-      startPoint: this.startPoint,
-      endPoint: this.endPoint,
-      speed: this.speed,
-      isRandom: this.name != "car",
-    });
-    this.steps = temp;
-  }
+    // 初始化時就計算 collistionScope
+    const speed_mps = (this.speed * 1000) / 3600;
+    this.collistionScope = {
+      length:
+        this.entitySize.length + speed_mps * config.params.t_safety,
+      width: this.entitySize.width + config.params.m * 2,
+    };
 
-  setCollistionScope() {
-    if (this.name === "car") {
-      const v_mps = (this._speed * 1000) / 3600;
-      const t_warning =
-        config.params.t_reaction + v_mps / config.params.a_brake;
-      const semiMajorAxis = v_mps * t_warning;
-      const semiMinorAxis = config.params.w_car + 2 * config.params.m;
-      this.collistionScope = {
-        length: semiMajorAxis,
-        width: semiMinorAxis,
-      };
-    } else {
-      this.collistionScope = {
-        length: this._entitySize.length,
-        width: this._entitySize.width,
-      };
+    // 如果提供了起點和終點，則計算路徑
+    if (this.startPoint && this.endPoint) {
+      this.resetSteps();
     }
   }
 
-  /**
-   * @param {{ length: number; width: number; }} value
-   */
-  set entitySize(value) {
-    this._entitySize = value;
-    this.setCollistionScope();
-  }
+  resetSteps() {
+    // 重新計算 collistionScope 以應對速度變化
+    const speed_mps = (this.speed * 1000) / 3600;
+    this.collistionScope = {
+      length:
+        this.entitySize.length + speed_mps * config.params.t_safety,
+      width: this.entitySize.width + config.params.m * 2,
+    };
 
-  get entitySize() {
-    return this._entitySize;
-  }
-
-  /**
-   * @param {any} value
-   */
-  set speed(value) {
-    this._speed = value;
-    this.steps = calcSteps({
-      startPoint: this.startPoint,
-      endPoint: this.endPoint,
-      speed: value,
-      isRandom: this.name != "car",
-    });
-    this.setCollistionScope();
-  }
-  get speed() {
-    return this._speed;
-  }
-
-  /**
-   * @param {Promise<any>} v
-   */
-  set modelFun(v) {
-    if (v) {
-      v.then((model) => {
-        this.model = model;
+    if (this.startPoint && this.endPoint) {
+      this.steps = calcSteps({
+        startPoint: this.startPoint,
+        endPoint: this.endPoint,
+        speed: this.speed,
+        isRandom: false, // 假設 obj 類別生成的路徑都不是隨機的
       });
     }
   }
