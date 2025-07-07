@@ -22,7 +22,7 @@ const secElement = document.querySelector("#sec");
 const brakeIndicator = document.createElement("div");
 
 // --- 狀態變數 ---
-let audio = null;
+let audio = new Audio("https://www.soundjay.com/buttons/beep-01a.mp3");
 let makerTemps = [];
 let elapsedTime = 0;
 let isPlaying = false;
@@ -514,11 +514,17 @@ function createPlayObjects() {
     scene.add(box);
 
     if (ped.model) {
+      const nextPedStep = ped.steps[1] || initialPedStep;
+      const dxPed = nextPedStep.x - initialPedStep.x;
+      const dzPed = nextPedStep.z - initialPedStep.z;
+      const initialPedAngle = Math.atan2(dxPed, dzPed);
+
       let pedModel = ped.model.clone();
       pedModel.name = "pedModel";
       pedModel.scale.set(0.015, 0.015, 0.015);
       pedModel.rotation.z = -Math.PI / 2;
       pedModel.rotation.x = -Math.PI / 2;
+
       pedModel.position.set(initialPedStep.x, 0.01, initialPedStep.z);
       pedsPlayModels.push(pedModel);
       scene.add(pedModel);
@@ -675,7 +681,18 @@ function animate(time) {
       ) {
         pedsPlayObjects[index].position.set(pedStep.x, 0.01, pedStep.z);
         if (pedsPlayModels[index]) {
+          const nextPedStep =
+            ped.steps[
+              pedCurrentStepIndex !== -1
+                ? pedCurrentStepIndex
+                : ped.steps.length - 1
+            ] || pedStep;
+          const dxPed = nextPedStep.x - pedStep.x;
+          const dzPed = nextPedStep.z - pedStep.z;
+          const pedAngle = Math.atan2(dxPed, dzPed);
+
           pedsPlayModels[index].position.set(pedStep.x, 0.01, pedStep.z);
+          pedsPlayModels[index].rotation.z = pedAngle;
         }
       }
     });
@@ -780,7 +797,7 @@ function animate(time) {
     } else if (isInWarningZone) {
       finalWarningMessage = "危險：已進入預警範圍！";
       finalWarningMessageClass = "alert-warning";
-      audio = new Audio("https://www.soundjay.com/buttons/beep-01a.mp3");
+
       audio.volume = 0.01;
       audio.play();
       const utterance = new SpeechSynthesisUtterance("請注意前方行人");
