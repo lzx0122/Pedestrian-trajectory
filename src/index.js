@@ -113,8 +113,8 @@ let car = new obj({
   name: "car",
   color: 0x007bff,
   speed: carSpeed,
-  startPoint: { x: -21, z: -50 },
-  endPoint: { x: 19, z: 50 },
+  startPoint: { x: -10, z: -50 },
+  endPoint: { x: 20, z: 50 },
   entitySize: { length: 4.63, width: config.params.w_car },
   modelFun: null,
 });
@@ -480,7 +480,7 @@ function createPlayObjects() {
     carModel.name = "carModel";
     carModel.scale.set(0.02, 0.01, 0.02);
     carModel.position.set(initialCarStep.x, 0.1, initialCarStep.z);
-    carModel.rotation.y = initialCarAngle + Math.PI / 2;
+    carModel.rotation.y = initialCarAngle;
     scene.add(carModel);
   }
 
@@ -635,7 +635,7 @@ function animate(time) {
       }
       if (carModel) {
         carModel.position.set(carStep.x, 0.1, carStep.z);
-        carModel.rotation.y = carAngle + Math.PI / 2; // 修正：補償模型本身的朝向
+        carModel.rotation.y = carAngle; // 修正：補償模型本身的朝向
       }
       if (carEllipse) {
         carEllipse.position.set(carStep.x, 0.01, carStep.z);
